@@ -7,6 +7,7 @@
 #define FIRMWARE_PATH  "/system/etc/firmware"
 #define UDEVLIBEXECDIR "/system/etc/udev"
 
+#include <grp.h>
 #include <sys/signalfd.h>
 
 /* stpcpy */
@@ -185,10 +186,6 @@ extern char *canonicalize_file_name(const char *path);
 #define libc_hidden_def(name)
 #define true 1
 
-/* FIXME */
-#include <grp.h>
-#define getgrnam_r(a,b,c,d,e) -1
-
 /* Nonzero if STATUS indicates the child continued after a stop. */
 #define W_CONTINUED      8       /* Report continued child.  */
 #define WIFCONTINUED(status) ((status) == W_CONTINUED)
@@ -210,4 +207,9 @@ typedef int (*__compar_d_fn_t) (const void *, const void *, void *);
 void qsort_r(void *base, size_t nmemb, size_t size,
 		int (*compar)(const void *, const void *, void *),
 		void *arg);
+
+/* work-around issue of sysconf(_SC_GETPW_R_SIZE_MAX) returning -1 */
+#include <sys/sysconf.h>
+extern long udev_sysconf(int name);
+#define sysconf(x) udev_sysconf(x)
 
