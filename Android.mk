@@ -1,9 +1,8 @@
 LOCAL_PATH:= $(call my-dir)
-include $(CLEAR_VARS)
 
 S:=dist/src/libudev
 
-LOCAL_SRC_FILES:= \
+libudev_common_src_files := \
  $(S)/libudev-device-private.c \
  $(S)/libudev-device.c \
  $(S)/libudev-enumerate.c \
@@ -34,15 +33,30 @@ LOCAL_SRC_FILES:= \
  android/log.c \
  android/missing.c
 
-
-LOCAL_C_INCLUDES += \
+libudev_common_c_includes := \
  external/udev/android \
  external/udev/dist/src/shared \
  external/udev/dist/src/systemd \
 
-LOCAL_CFLAGS += -Wno-missing-field-initializers
-LOCAL_CFLAGS += -std=gnu99
-LOCAL_CFLAGS += -include external/udev/android/udev.h
+libudev_common_c_flags := \
+ -Wno-missing-field-initializers \
+ -std=gnu99 \
+ -include external/udev/android/udev.h
+
+### libudev.so
+
+include $(CLEAR_VARS)
+
+S:=dist/src/libudev
+
+LOCAL_SRC_FILES:= \
+ $(libudev_common_src_files)
+
+LOCAL_C_INCLUDES += \
+ $(libudev_common_c_includes)
+
+LOCAL_CFLAGS += \
+ $(libudev_common_c_flags)
 
 LOCAL_SHARED_LIBRARIES += libcutils
 
@@ -54,7 +68,28 @@ LOCAL_PRELINK_MODULE:= false
 
 include $(BUILD_SHARED_LIBRARY)
 
-###
+### libudev.a
+
+include $(CLEAR_VARS)
+
+S:=dist/src/libudev
+
+LOCAL_SRC_FILES:= \
+ $(libudev_common_src_files)
+
+LOCAL_C_INCLUDES += \
+ $(libudev_common_c_includes)
+
+LOCAL_CFLAGS += \
+ $(libudev_common_c_flags)
+
+LOCAL_MODULE:= libudev
+LOCAL_MODULE_TAGS := optional
+LOCAL_PRELINK_MODULE:= false
+
+include $(BUILD_STATIC_LIBRARY)
+
+### udevadm
 
 include $(CLEAR_VARS)
 
@@ -96,14 +131,18 @@ LOCAL_CFLAGS += -std=gnu99
 LOCAL_CFLAGS += -include external/udev/android/udev.h
 LOCAL_CFLAGS += -DVERSION=\"$(shell head -n 1 $(LOCAL_PATH)/VERSION)\"
 
-LOCAL_SHARED_LIBRARIES := libudev
+LOCAL_STATIC_LIBRARIES := libudev libcutils liblog libc
 
 LOCAL_MODULE := udevadm
 LOCAL_MODULE_TAGS := optional
 
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT)/sbin
+LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)/sbin
+
 include $(BUILD_EXECUTABLE)
 
-###
+### udevd
 
 include $(CLEAR_VARS)
 
@@ -137,10 +176,28 @@ LOCAL_CFLAGS += -std=gnu99
 LOCAL_CFLAGS += -include external/udev/android/udev.h
 LOCAL_CFLAGS += -DVERSION=\"$(shell head -n 1 $(LOCAL_PATH)/VERSION)\"
 
-LOCAL_SHARED_LIBRARIES := libudev
+LOCAL_STATIC_LIBRARIES := libudev libcutils liblog libc
 
 LOCAL_MODULE := udevd
 LOCAL_MODULE_TAGS := optional
+
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT)/sbin
+LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)/sbin
+
+include $(BUILD_EXECUTABLE)
+
+### 50-udev-default.rules
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := 50-udev-default.rules
+LOCAL_MODULE_CLASS :=_ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/udev/rules.d
+LOCAL_SRC_FILES := android/rules/50-udev-default.rules
+LOCAL_MODULE_TAGS := optional
+
+include $(BUILD_PREBUILT)
 
 $(LOCAL_PATH)/$(S)/keyboard-keys.txt: $(LOCAL_PATH)/Android.mk
 	$(TARGET_CC) -E $(TARGET_C_INCLUDES:%=-I%) -dM -include linux/input.h - < /dev/null | awk '/^#define[ \t]+KEY_[^ ]+[ \t]+[0-9]/ { if ($$2 != "KEY_MAX") { print $$2 } }' | sed 's/^KEY_COFFEE$$/KEY_SCREENLOCK/' > $@
@@ -158,5 +215,4 @@ $(LOCAL_PATH)/$(S)/udev-builtin-keyboard.c: \
  $(LOCAL_PATH)/$(S)/keyboard-keys-from-name.h \
  $(LOCAL_PATH)/$(S)/keyboard-keys-to-name.h
 
-include $(BUILD_EXECUTABLE)
 
